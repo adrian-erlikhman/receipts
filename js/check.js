@@ -1,6 +1,6 @@
 // Goes through an essay sentence by sentence and says, for each one, which
 // source it leans on and whether it handles that source honestly.
-import { sentences, norm, quotesIn, numbersIn, words } from './text.js';
+import { sentences, norm, quotesIn, numbersIn, words, terms } from './text.js';
 import { passagesOf, buildIndex, longestRun, trigramContainment } from './match.js';
 
 export const LIMITS = {
@@ -44,22 +44,80 @@ function citedSource(cite, sources) {
 const stripCites = (s) => s.replace(CITE, ' ');
 const stripQuotes = (s) => s.replace(/[“"][^”"]{3,400}[”"]/g, ' ');
 
+// Where a quotation appears in the sources. Words are compared, so case and
+// punctuation don't count ("lazy." matches "lazy;"). An ellipsis stands for
+// left-out words, a [bracket] for up to five changed words, and "[T]eenagers"
+// is read as "Teenagers". Returns the source index, or -1.
+export function findQuote(quote, sourceWords) {
+  const pieces = quote.replace(/\[(\p{L}{1,3})\](?=\p{L})/gu, '$1').split(/(\.\s?\.\s?\.|…|\[[^\]]*\])/);
+  const parts = [];
+  let gap = Infinity;
+  for (const piece of pieces) {
+    if (/^(?:\.\s?\.\s?\.|…)$/.test(piece)) gap = Infinity;
+    else if (/^\[[^\]]*\]$/.test(piece)) gap = Math.max(gap, 5);
+    else { const w = words(piece); if (w.length) { parts.push({ w, gap }); gap = 0; } }
+  }
+  const count = parts.reduce((n, p) => n + p.w.length, 0);
+  return { words: count, source: count ? sourceWords.findIndex((hay) => inOrder(hay, parts)) : -1 };
+}
+
+function inOrder(hay, parts) {
+  const failed = new Set();
+  const go = (k, from) => {
+    if (k === parts.length) return true;
+    const key = k * (hay.length + 1) + from;
+    if (failed.has(key)) return false;
+    const { w, gap } = parts[k];
+    const last = Math.min(hay.length - w.length, from + gap);
+    for (let i = from; i <= last; i++) {
+      let j = 0;
+      while (j < w.length && hay[i + j] === w[j]) j++;
+      if (j === w.length && go(k + 1, i + w.length)) return true;
+    }
+    failed.add(key);
+    return false;
+  };
+  return go(0, 0);
+}
+
+// The source sentence that shares the most of a misquote's words, if any
+// shares at least 40% of them.
+function closestSentence(quote, passages) {
+  const want = new Set(terms(quote));
+  let best = null;
+  let bestShare = 0.4;
+  for (const p of passages) {
+    const have = new Set(terms(p.text));
+    let hit = 0;
+    for (const t of want) if (have.has(t)) hit++;
+    if (want.size && hit / want.size >= bestShare) { best = p; bestShare = hit / want.size + 1e-9; }
+  }
+  return best;
+}
+
+// Titles ("Bells and Buses") and one- or two-word scare quotes aren't
+// quotations from a source, so they aren't flagged when no source has them.
+function looseQuote(q, count) {
+  const big = (q.match(/\p{L}[\p{L}\p{M}'’-]*/gu) || []).filter((w) => w.length > 3);
+  return count < 3 || (big.length >= 2 && big.every((w) => /^\p{Lu}/u.test(w)));
+}
+
 export function check(essay, sources, opts = {}) {
   const { matrix, ...limits } = opts;
   const L = { ...LIMITS, ...limits };
   const passages = passagesOf(sources);
   const sents = sentences(essay);
   const index = buildIndex(passages, sents.map((s) => s.text));
-  const sourceText = sources.map((s) => norm(s.text));
+  const sourceWords = sources.map((s) => words(s.text));
 
   // First pass: which source each sentence leans on.
   const meaning = opts.matrix || null; // matrix[k][p] from embed.js
   const firstPass = sents.map((s, k) => {
     const plain = stripCites(s.text);
     const quotes = quotesIn(plain).map((q) => {
-      const n = norm(q);
-      const at = sourceText.findIndex((t) => t.includes(n));
-      return { text: q, source: at, ok: at >= 0 };
+      const found = findQuote(q, sourceWords);
+      const ok = found.source >= 0;
+      return { text: q, source: found.source, ok, checked: ok || (found.words > 0 && !looseQuote(q, found.words)) };
     });
     const ranked = index.query(stripQuotes(plain).trim() ? plain : s.text);
     const top = ranked[0];
@@ -88,7 +146,12 @@ export function check(essay, sources, opts = {}) {
     const nextCites = next && next.para === s.para && firstPass[k + 1].usesSource === usesSource ? citationsIn(next.text) : [];
 
     // 1. Quotations have to appear word for word in a source.
-    for (const q of quotes) if (!q.ok) add('misquote', `"${q.text}" doesn't appear word for word in any source.`);
+    for (const q of quotes) {
+      if (q.ok || !q.checked) continue;
+      const near = closestSentence(q.text, passages);
+      const hint = near ? ` The closest sentence is in ${sources[near.source].label}: "${near.text}"` : '';
+      add('misquote', `"${q.text}" doesn't appear word for word in any source.${hint}`);
+    }
 
     // 3. Wording copied without quotation marks.
     let close = null;

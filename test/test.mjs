@@ -77,6 +77,24 @@ t('a correct quotation with a correct citation passes', () => {
   assert.ok(row.quotes[0].ok);
 });
 
+t('a misquote names the closest source sentence', () => {
+  assert.match(find(/As Okafor puts it/).issues[0].text, /closest sentence is in Okafor 2023: "Teenagers are not lazy; their clocks/);
+});
+
+const OK = [{ author: 'Okafor', label: 'Okafor 2023', text: 'Teenagers are not lazy; their clocks simply run on a later schedule. Most need eight hours.' }];
+t('quotations are compared word for word, allowing punctuation, ellipses and brackets', () => {
+  const ok = (essay) => check(essay, OK).rows[0].quotes.every((q) => q.ok);
+  assert.ok(ok('She writes that "Teenagers are not lazy." (Okafor 3).'));
+  assert.ok(ok('She writes that "teenagers are not lazy ... [they] simply run on a later schedule" (Okafor).'));
+  assert.ok(ok('She writes that "[t]heir clocks simply run on a later schedule" (Okafor).'));
+  assert.ok(!ok('She writes that "teenagers [are] on a later schedule" (Okafor).'));
+  assert.ok(!ok('She writes that "teenagers are never lazy" (Okafor).'));
+});
+t('titles and one- or two-word scare quotes are not misquotes', () => {
+  const r = check('In "Why Teenagers Fall Asleep Late," the author is not "woke" about it.', OK);
+  assert.deepEqual(kinds(r.rows[0]), []);
+});
+
 t('copied words are shown as the source prints them', () => {
   assert.match(find(/^During adolescence/).issues[0].text, /body's internal clock/);
 });
