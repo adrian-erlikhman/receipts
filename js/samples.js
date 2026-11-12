@@ -4,7 +4,7 @@
 export const SAMPLE = {
   essay: `High schools should not start classes before 8:30 in the morning.
 
-During adolescence, the body's internal clock shifts later, so many teenagers cannot fall asleep before 11 p.m. no matter how early they go to bed (Okafor). Melatonin, the hormone that signals sleepiness, is released one to two hours later in teenagers than in children and adults (Okafor). As Okafor puts it, "teenagers are not lazy, they are simply on a different schedule."
+During adolescence, the body's internal clock shifts later, so many teenagers cannot fall asleep before 11 p.m. no matter how early they go to bed (Okafor). Melatonin, the hormone that signals sleepiness, is released one to two hours later in teenagers than in children and adults (Okafor). Only about a third of high schoolers sleep the recommended amount before a school day. As Okafor puts it, "teenagers are not lazy, they are simply on a different schedule."
 
 The evidence from districts that tried later start times is encouraging. After Hollis County moved its first bell from 7:30 to 8:35, students slept 43 more minutes per night (Hollis County School District 3). Tardiness also fell by 18 percent in the first year. Students at later-starting schools also earned higher SAT scores (Hollis County School District 7).
 

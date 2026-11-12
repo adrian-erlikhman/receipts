@@ -98,8 +98,11 @@ export function check(essay, sources, opts = {}) {
         const run = longestRun(bare, best.context);
         const contain = trigramContainment(bare, best.context);
         if (run.length >= L.run || contain >= L.containment) {
-          close = { run: run.length, words: run.words, containment: contain };
-          add('close', `${run.length} words in a row match the source without quotation marks ("${run.words}"). Quote it or put it in your own words.`);
+          // Show the copied words as the source prints them.
+          const pattern = run.words.split(' ').map((w) => [...w].map((c) => c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join("['’]?")).join('[^A-Za-z0-9%]+');
+          const shown = (best.context.match(new RegExp(pattern, 'i')) || [run.words])[0];
+          close = { run: run.length, words: shown, containment: contain };
+          add('close', `${run.length} words in a row match the source without quotation marks ("${shown}"). Quote it or put it in your own words.`);
         }
       }
     }

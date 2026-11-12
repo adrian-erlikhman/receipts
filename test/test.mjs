@@ -61,13 +61,21 @@ t('a correct quotation with a correct citation passes', () => {
   assert.ok(row.quotes[0].ok);
 });
 
+t('copied words are shown as the source prints them', () => {
+  assert.match(find(/^During adolescence/).issues[0].text, /body's internal clock/);
+});
+t('a paraphrase with few shared words is left alone by word matching', () => {
+  assert.equal(find(/^Only about a third/).status, 'own');
+});
 t('the on-device model can add a match the words missed', () => {
   const n = r.rows.length;
   const P = SAMPLE.sources.reduce((m, src) => m + sentences(src.text).length, 0);
-  const matrix = Array.from({ length: n }, (_, k) => Array.from({ length: P }, (_, p) => (k === 0 && p === 0 ? 0.9 : 0.1)));
+  const k = r.rows.findIndex((x) => /^Only about a third/.test(x.text));
+  const matrix = Array.from({ length: n }, (_, i) => Array.from({ length: P }, (_, p) => (i === k && p === 5 ? 0.64 : 0.1)));
   const r2 = check(SAMPLE.essay, SAMPLE.sources, { matrix });
-  assert.equal(r2.rows[0].matchedBy, 'meaning');
-  assert.equal(r2.rows[0].status, 'uncited');
+  assert.equal(r2.rows[k].matchedBy, 'meaning');
+  assert.equal(r2.rows[k].status, 'uncited');
+  assert.equal(r2.rows[k].source, 0);
 });
 
 console.log(`${passed} tests passed`);
