@@ -27,20 +27,29 @@ function addSourceRow(src = {}) {
   $('.s-remove', li).addEventListener('click', () => li.remove());
   $('.s-file', li).addEventListener('change', async (e) => {
     const f = e.target.files[0];
+    e.target.value = ''; // so loading the same file again still fires
     if (!f) return;
-    try { $('.s-text', li).value = /\.pdf$/i.test(f.name) || f.type === 'application/pdf' ? await pdfText(f) : await f.text(); if (!$('.s-author', li).value) $('.s-author', li).value = f.name.replace(/\.[^.]+$/, ''); }
-    catch (err) { status(`Couldn't read ${f.name}: ${err.message}`, true); }
+    status(`Reading ${f.name}…`);
+    try {
+      const text = (/\.pdf$/i.test(f.name) || f.type === 'application/pdf' ? await pdfText(f) : await f.text()).trim();
+      if (!text) return status(`No text found in ${f.name}. If it's a scanned page, copy the text in by hand.`, true);
+      $('.s-text', li).value = text;
+      if (!$('.s-author', li).value) $('.s-author', li).value = f.name.replace(/\.[^.]+$/, '');
+      status(`Loaded ${plural(text.split(/\s+/).length, 'word')} from ${f.name}.`);
+    } catch (err) { status(`Couldn't read ${f.name}: ${err.message}`, true); }
   });
   $('#sourceList').append(li);
 }
 
 function readForm() {
-  const sources = [...document.querySelectorAll('#sourceList > li')].map((li) => {
+  const rows = [...document.querySelectorAll('#sourceList > li')].map((li, i) => {
     const author = $('.s-author', li).value.trim();
     const year = $('.s-year', li).value.trim();
-    return { author, label: [author, year].filter(Boolean).join(' ') || 'Untitled source', text: $('.s-text', li).value.trim() };
-  }).filter((s) => s.text);
-  return { essay: $('#essay').value.trim(), sources };
+    return { author, label: [author, year].filter(Boolean).join(' ') || `Source ${i + 1}`, text: $('.s-text', li).value.trim() };
+  });
+  // A source with a name but no text is skipped; say so rather than drop it quietly.
+  const skipped = rows.filter((s) => !s.text && s.author).map((s) => s.label);
+  return { essay: $('#essay').value.trim(), sources: rows.filter((s) => s.text), skipped };
 }
 
 async function pdfText(file) {
@@ -49,37 +58,64 @@ async function pdfText(file) {
   const doc = await pdfjs.getDocument({ data: await file.arrayBuffer() }).promise;
   const pages = [];
   for (let p = 1; p <= doc.numPages; p++) pages.push((await (await doc.getPage(p)).getTextContent()).items.map((i) => i.str).join(' '));
-  return pages.join('\n\n').replace(/-\s+(?=[a-z])/g, '').replace(/\s{2,}/g, ' ');
+  return pages.join('\n\n').normalize('NFKC').replace(/-\s+(?=[a-z])/g, '').replace(/\s{2,}/g, ' ');
 }
 
 function status(msg, err = false) { const s = $('#status'); s.textContent = msg; s.className = err ? 'status err' : 'status'; }
 
 // ---------- running ----------
+const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+// A short reason the on-device model couldn't run.
+function modelProblem(err) {
+  const m = String(err?.message || err);
+  if (/fetch|network|load|import/i.test(m)) return "it couldn't be downloaded; check your connection";
+  if (/WebAssembly|wasm|backend/i.test(m)) return "this browser can't run it";
+  return m.slice(0, 120);
+}
+
+let running = false;
 async function run() {
-  const { essay, sources } = readForm();
-  if (!essay) return status('Paste your essay first.', true);
-  if (!sources.length) return status('Add at least one source.', true);
-  state.essay = essay; state.sources = sources; state.claude = {};
-  let matrix = null;
-  if ($('#useModel').checked) {
-    try {
-      status('Loading the on-device model (first time only)…');
-      const { loadModel, meaningMatrix } = await import('./embed.js');
-      await loadModel((p) => { if (p.status === 'progress' && p.file?.endsWith('.onnx')) status(`Downloading the model… ${Math.round(p.progress)}%`); });
-      status('Comparing meaning…');
-      const { sentences } = await import('./text.js');
-      matrix = await meaningMatrix(sentences(essay).map((s) => s.text), passagesOf(sources).map((p) => p.context));
-    } catch (err) {
-      status(`The on-device model didn't load (${err.message}). Matching by words only.`, true);
+  if (running) return;
+  const { essay, sources, skipped } = readForm();
+  if (!essay) { $('#essay').focus(); return status('Paste your essay first.', true); }
+  if (!sources.length) return status(skipped.length ? `${skipped[0]} has no text yet. Paste it in or load a file.` : 'Add at least one source.', true);
+  running = true;
+  $('#run').disabled = $('#tryDemo').disabled = true;
+  $('#run').textContent = 'Checking…';
+  try {
+    state.essay = essay; state.sources = sources; state.claude = {};
+    let matrix = null;
+    let problem = '';
+    if ($('#useModel').checked) {
+      try {
+        status('Loading the on-device model (first time only)…');
+        const { loadModel, meaningMatrix } = await import('./embed.js');
+        await loadModel((p) => { if (p.status === 'progress' && p.file?.endsWith('.onnx')) status(`Downloading the model… ${Math.round(p.progress)}%`); });
+        status('Comparing meaning…');
+        const { sentences } = await import('./text.js');
+        matrix = await meaningMatrix(sentences(essay).map((s) => s.text), passagesOf(sources).map((p) => p.context));
+      } catch (err) {
+        problem = modelProblem(err);
+      }
     }
+    state.result = check(essay, sources, matrix ? { matrix } : {});
+    state.selected = state.result.rows.findIndex((r) => r.status !== 'own' && r.status !== 'backed');
+    if (state.selected < 0) state.selected = 0;
+    state.filter = null;
+    const notes = [];
+    if (skipped.length) notes.push(`Skipped ${skipped.join(', ')}: no text.`);
+    if (sources.some((s) => !s.author) && /\([^()]*\p{L}{3,}[^()]*\)/u.test(essay)) notes.push('Give each source the name your citations use, or citations can\'t find it.');
+    const done = `Checked ${plural(state.result.rows.length, 'sentence')} against ${plural(sources.length, 'source')}`;
+    if (problem) status(`${done} by words only. The on-device model didn't run: ${problem}. ${notes.join(' ')}`.trim(), true);
+    else status(`${done}${matrix ? ', by words and by meaning' : ''}. ${notes.join(' ')}`.trim(), notes.length > 0);
+    render();
+    $('#report').scrollIntoView({ behavior: 'smooth' });
+  } finally {
+    running = false;
+    $('#run').disabled = $('#tryDemo').disabled = false;
+    $('#run').textContent = 'Check my essay';
   }
-  state.result = check(essay, sources, matrix ? { matrix } : {});
-  state.selected = state.result.rows.findIndex((r) => r.status !== 'own' && r.status !== 'backed');
-  if (state.selected < 0) state.selected = 0;
-  state.filter = null;
-  if (!matrix || !$('#status').classList.contains('err')) status(`Checked ${state.result.rows.length} sentences against ${sources.length} source${sources.length > 1 ? 's' : ''}${matrix ? ', by words and by meaning' : ''}.`);
-  render();
-  $('#report').scrollIntoView({ behavior: 'smooth' });
 }
 
 // ---------- rendering ----------
