@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Receipts: every claim in your essay, checked against its source</title>
+<meta name="description" content="Paste your essay and your sources. Receipts matches every sentence to the source it leans on and flags copied wording, misquotes, wrong numbers and missing or wrong citations, before your teacher does.">
+<meta property="og:title" content="Receipts">
+<meta property="og:description" content="Every claim in your essay, checked against the source it came from.">
+<meta property="og:image" content="og.png">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M7 3h18v26l-3-2-3 2-3-2-3 2-3-2-3 2z' fill='%23fffef8' stroke='%231d1b16' stroke-width='2'/%3E%3Cpath d='M11 10h10M11 15h10M11 20h6' stroke='%231d1b16' stroke-width='2'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<a class="skip" href="#essay">Skip to the checker</a>
+<header class="top">
+  <a class="brand" href="./"><span class="tear" aria-hidden="true"></span>Receipts</a>
+  <nav><a href="#how">How it works</a><a href="https://github.com/adrian-erlikhman/receipts">GitHub</a></nav>
+</header>
+
+<main>
+  <section class="hero">
+    <p class="eyebrow">For students writing with sources</p>
+    <h1>Show your receipts.</h1>
+    <p class="lede">Paste your essay and the sources you used. Receipts matches every sentence to the source it leans on and flags what a teacher would catch: copied wording, misquotes, wrong numbers, and missing or wrong citations.</p>
+    <div class="cta">
+      <button class="btn primary" id="tryDemo">Try a sample essay</button>
+      <a class="btn" href="#inputs">Check my essay</a>
+    </div>
+    <p class="fine">Runs in your browser. Your essay and sources never leave this page unless you turn on Claude with your own key.</p>
+  </section>
+
+  <section id="report" class="report" hidden>
+    <div class="tally" id="tally" role="group" aria-label="Summary"></div>
+    <div class="cols">
+      <article class="paper" id="essayView" aria-label="Your essay, sentence by sentence"></article>
+      <aside class="detail" id="detail" aria-live="polite"></aside>
+    </div>
+    <div class="sources-used" id="sourcesUsed"></div>
+  </section>
+
+  <section id="inputs" class="inputs">
+    <h2>Your essay</h2>
+    <label class="field" for="essay">Paste the essay, with its in-text citations (MLA, APA or [1]-style)</label>
+    <textarea id="essay" rows="12" spellcheck="false" placeholder="High schools should not start before 8:30 (Okafor 4). …"></textarea>
+
+    <h2>Your sources</h2>
+    <p class="hint">Paste the text of each source you used, or load a PDF. Name each one the way your citations do, like “Okafor” or “Rivera and Chen.”</p>
+    <ol id="sourceList" class="source-list"></ol>
+    <button class="btn small" id="addSource">+ Add a source</button>
+
+    <div class="row go">
+      <button class="btn primary" id="run">Check my essay</button>
+      <label class="check"><input type="checkbox" id="useModel"> Also match by meaning with an on-device AI model <span class="fine">(downloads 23 MB once, runs on your computer)</span></label>
+      <span class="status" id="status" role="status"></span>
+    </div>
+
+    <details class="claude">
+      <summary>Ask Claude whether a source really supports a claim (optional, your own key)</summary>
+      <p>After a check, each matched sentence gets an “Ask Claude” button. Claude reads the sentence and the passage and says whether it supports it, partly supports it, or doesn't. Its answer has to quote the passage word for word or it is thrown out. Your key stays in this tab and goes only to api.anthropic.com.</p>
+      <div class="pair">
+        <label class="field">Anthropic API key <input id="apiKey" type="password" autocomplete="off" placeholder="sk-ant-…"></label>
+        <label class="field">Model <select id="model"></select></label>
+      </div>
+    </details>
+  </section>
+
+  <section id="how" class="how">
+    <h2>How it works</h2>
+    <div class="three">
+      <div><h3>Match</h3><p>Each sentence of your essay is compared with every passage of your sources by the words and word pairs they share, weighted by how rare those words are (TF-IDF). Turn on the on-device model and it also compares meaning, so a real paraphrase still finds its source.</p></div>
+      <div><h3>Check</h3><p>Quotations must appear word for word in a source. Seven or more words in a row from a source without quotation marks is flagged. Figures are compared with the same kind of figure in the source (“43 minutes” against “34 minutes”). Citations must point to the source the sentence actually uses.</p></div>
+      <div><h3>Fix</h3><p>Click any sentence to see the passage it matched, with the shared words marked, and what to change. Sentences with no match are left alone: that's your own argument.</p></div>
+    </div>
+    <p class="fine">Receipts helps you check your own work. It isn't a plagiarism detector for other people's work, and its matches are suggestions to review, not verdicts.</p>
+  </section>
+</main>
+
+<footer class="foot">Receipts is open source (MIT). Built by Adrian Erlikhman and Michael Tarekegn. The sample essay and sources are made up.</footer>
+
+<template id="tplSource">
+  <li class="src">
+    <div class="pair">
+      <label class="field">Name, as cited <input class="s-author" type="text" placeholder="Okafor"></label>
+      <label class="field">Year or note <span class="opt">(optional)</span> <input class="s-year" type="text" placeholder="2023"></label>
+    </div>
+    <label class="field">Source text <textarea class="s-text" rows="5" spellcheck="false"></textarea></label>
+    <div class="row"><label class="btn small file">Load a PDF or .txt<input class="s-file" type="file" accept=".pdf,.txt" hidden></label><button class="btn small ghost s-remove">Remove</button></div>
+  </li>
+</template>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
