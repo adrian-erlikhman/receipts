@@ -200,7 +200,10 @@ export function check(essay, sources, opts = {}) {
         if (run.length >= L.run || contain >= L.containment) {
           // Show the copied words as the source prints them.
           const pattern = run.words.split(' ').map((w) => [...w].map((c) => c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join("['’]?")).join('[^\\p{L}\\p{N}%]+');
-          const shown = (best.context.match(new RegExp(pattern, 'iu')) || [run.words])[0];
+          const at = best.context.match(new RegExp(pattern, 'iu'));
+          let shown = at ? at[0] : run.words;
+          // Keep the last period of "p.m." or "U.S." when the run ends inside it.
+          if (at && /(?:^|[^\p{L}])\p{L}\.\p{L}$/u.test(shown) && best.context[at.index + shown.length] === '.') shown += '.';
           close = { run: run.length, words: shown, containment: contain };
           add('close', `${run.length} words in a row match the source without quotation marks ("${shown}"). Quote it or put it in your own words.`);
         }
@@ -215,7 +218,7 @@ export function check(essay, sources, opts = {}) {
         if (!n.unit) continue;
         const same = theirs.filter((t) => t.unit === n.unit);
         if (same.length && !same.some((t) => Math.abs(t.value - n.value) < 1e-9)) {
-          add('number', `You wrote ${n.raw}; ${sources[usesSource].label} says ${[...new Set(same.map((t) => t.raw))].join(' / ')}.`);
+          add('number', `You wrote ${n.raw}; ${sources[usesSource].label} says ${[...new Set(same.map((t) => t.raw))].join(' / ').replace(/\.$/, '')}.`);
         }
       }
     }

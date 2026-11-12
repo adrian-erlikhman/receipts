@@ -113,7 +113,7 @@ const WORDNUM = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, 
 export function numbersIn(text) {
   const out = [];
   const t = String(text).replace(/\b\d{1,2}:\d{2}\b/g, ' '); // clock times aren't figures
-  const re = /(\$\s?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?(?:\s?(?:million|billion|thousand))?|(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?)\s?(?:(?:more|fewer|less|additional|extra|full|whole|of|an|a)\s)?(%|percent(?:age points?)?|[a-z]+)?/gi;
+  const re = /(\$\s?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?(?:\s?(?:million|billion|thousand))?|(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?)\s?(?:(?:more|fewer|less|additional|extra|full|whole|of|an|a)\s)?(%|percent(?:age points?)?|[ap]\.m\.|\p{L}+)?/giu;
   let m;
   while ((m = re.exec(t))) {
     const raw = m[1];
@@ -128,7 +128,8 @@ export function numbersIn(text) {
     else if (raw.includes('$')) unit = 'money';
     else unit = unit.replace(/s$/, '');
     if (!raw.includes('$') && !raw.includes(',') && value >= 1900 && value <= 2100) continue; // a year
-    out.push({ raw: (raw + (m[2] && unit !== 'money' ? ' ' + m[2] : '')).trim(), value, unit });
+    const shown = !m[2] || unit === 'money' ? '' : m[2] === '%' ? '%' : ` ${m[2]}`;
+    out.push({ raw: (raw + shown).trim(), value, unit });
   }
   return out;
 }

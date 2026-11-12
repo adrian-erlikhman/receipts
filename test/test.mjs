@@ -34,6 +34,12 @@ t('numbers carry their units; years and clock times are skipped', () => {
   assert.deepEqual(n.map((x) => [x.value, x.unit]), [[43, 'minute'], [18, 'percent'], [1.2e6, 'money']]);
 });
 
+t('times like "10 p.m." are compared and printed in full', () => {
+  assert.deepEqual(numbersIn('after 11 p.m., up 3.5%').map((x) => x.raw), ['11 p.m.', '3.5%']);
+  const r = check('Most teens cannot fall asleep before 10 p.m. on school nights (Okafor).', [{ author: 'Okafor', label: 'Okafor', text: 'Most teens cannot fall asleep before 11 p.m. on school nights.' }]);
+  assert.ok(r.rows[0].issues.some((i) => i.text === 'You wrote 10 p.m.; Okafor says 11 p.m.'));
+});
+
 t('citations are read; asides are not', () => {
   const c = citationsIn('A claim (Okafor 12). Another (Rivera and Chen, 2024). A third [2]. An aside (which is long and not a citation at all here).');
   assert.deepEqual(c.map((x) => x.name ?? x.number), ['Okafor', 'Rivera and Chen', 2]);
