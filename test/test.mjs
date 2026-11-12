@@ -18,6 +18,12 @@ t('sentences still end at words like "sleep." and "help."', () => {
   assert.deepEqual(s.map((x) => x.text), ['Teens need more sleep.', 'Schools should help.', 'See p. 4 and No. 3 for more.', 'Then we step up.']);
 });
 
+t('words in other alphabets are compared too', () => {
+  const r = check('Подростки должны спать не меньше восьми часов каждую ночь в течение учебной недели (Иванов).', [{ author: 'Иванов', label: 'Иванов', text: 'Подростки должны спать не меньше восьми часов каждую ночь в течение учебной недели, считают врачи.' }]);
+  assert.equal(r.rows[0].status, 'close');
+  assert.deepEqual(r.rows[0].cites.map((c) => c.source), [0]);
+});
+
 t('a quotation that runs over two sentences stays one sentence', () => {
   const s = sentences('As Okafor writes, "Teens need more sleep. Schools should help." That is the point. She says "they are not lazy ... [their] clocks run late" (Okafor).');
   assert.deepEqual(s.map((x) => x.text), ['As Okafor writes, "Teens need more sleep. Schools should help."', 'That is the point.', 'She says "they are not lazy ... [their] clocks run late" (Okafor).']);

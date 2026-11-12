@@ -103,7 +103,7 @@ function render() {
 
 function highlight(passage, sentence) {
   const want = new Set(terms(sentence));
-  return esc(passage).replace(/[A-Za-z][A-Za-z']+/g, (w) => (want.has(stem(w.toLowerCase().replace(/'/g, ''))) ? `<mark>${w}</mark>` : w));
+  return esc(passage).replace(/\p{L}[\p{L}\p{M}’]+/gu, (w) => (want.has(stem(w.normalize('NFKC').toLowerCase().replace(/’/g, ''))) ? `<mark>${w}</mark>` : w));
 }
 
 function renderDetail() {

@@ -20,7 +20,7 @@ export function citationsIn(text) {
   while ((m = CITE.exec(text))) {
     if (m[2]) { out.push({ raw: m[0], number: Number(m[2]) }); continue; }
     const inner = m[1].trim();
-    if (!/[A-Za-z]{3,}/.test(inner)) continue;
+    if (!/\p{L}{3,}/u.test(inner)) continue;
     if (/^(e\.g\.|i\.e\.|see|or|and|which|who)\b/i.test(inner)) continue;
     if (inner.split(/\s+/).length > 9) continue; // an aside, not a citation
     const name = inner.replace(/\b(p|pp)\.\s*/g, '').replace(/,?\s*\d[\d\s,–-]*$/, '').replace(/\bet al\.?/, '').trim();
@@ -99,8 +99,8 @@ export function check(essay, sources, opts = {}) {
         const contain = trigramContainment(bare, best.context);
         if (run.length >= L.run || contain >= L.containment) {
           // Show the copied words as the source prints them.
-          const pattern = run.words.split(' ').map((w) => [...w].map((c) => c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join("['’]?")).join('[^A-Za-z0-9%]+');
-          const shown = (best.context.match(new RegExp(pattern, 'i')) || [run.words])[0];
+          const pattern = run.words.split(' ').map((w) => [...w].map((c) => c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join("['’]?")).join('[^\\p{L}\\p{N}%]+');
+          const shown = (best.context.match(new RegExp(pattern, 'iu')) || [run.words])[0];
           close = { run: run.length, words: shown, containment: contain };
           add('close', `${run.length} words in a row match the source without quotation marks ("${shown}"). Quote it or put it in your own words.`);
         }

@@ -71,8 +71,10 @@ function mergeShort(list) {
   return out;
 }
 
+// Words in any alphabet ("más", "Иванов"), lowercased. NFKC turns PDF
+// ligatures like "ﬁ" back into plain letters.
 export function words(text) {
-  return String(text).toLowerCase().replace(/[’']/g, '').match(/[a-z0-9]+(?:\.\d+)?%?/g) || [];
+  return String(text).normalize('NFKC').toLowerCase().replace(/[’']/g, '').match(/[\p{L}\p{N}][\p{L}\p{M}\p{N}]*(?:\.\d+)?%?/gu) || [];
 }
 
 export function stem(w) {
@@ -91,7 +93,7 @@ export function norm(text) {
     .replace(/[“”«»„]/g, '"')
     .replace(/[‘’]/g, "'")
     .replace(/[–—]/g, '-')
-    .replace(/[^a-z0-9%$.'\- ]+/g, ' ')
+    .replace(/[^\p{L}\p{M}\p{N}%$.'\- ]+/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
