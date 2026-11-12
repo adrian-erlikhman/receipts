@@ -15,11 +15,15 @@ export async function loadModel(onProgress = () => {}) {
   return extractor;
 }
 
-export async function embed(texts, batch = 16) {
+// onBatch(n) is called after every batch, with how many texts are done. The
+// pause between batches lets the page repaint while a long essay is embedded.
+export async function embed(texts, batch = 16, onBatch = () => {}) {
   const out = [];
   for (let i = 0; i < texts.length; i += batch) {
     const t = await extractor(texts.slice(i, i + batch), { pooling: 'mean', normalize: true });
     out.push(...t.tolist());
+    onBatch(out.length);
+    await new Promise((r) => setTimeout(r, 0));
   }
   return out;
 }
@@ -30,8 +34,11 @@ export function cosine(a, b) {
   return s;
 }
 
-// similarity[k][p] for essay sentence k and source passage p.
-export async function meaningMatrix(sentenceTexts, passageTexts) {
-  const [se, pe] = [await embed(sentenceTexts), await embed(passageTexts)];
+// similarity[k][p] for essay sentence k and source passage p. onProgress gets
+// the share of texts embedded so far, from 0 to 1.
+export async function meaningMatrix(sentenceTexts, passageTexts, onProgress = () => {}) {
+  const total = sentenceTexts.length + passageTexts.length;
+  const se = await embed(sentenceTexts, 16, (n) => onProgress(n / total));
+  const pe = await embed(passageTexts, 16, (n) => onProgress((sentenceTexts.length + n) / total));
   return se.map((v) => pe.map((w) => cosine(v, w)));
 }

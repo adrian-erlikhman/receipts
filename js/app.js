@@ -94,7 +94,7 @@ async function run() {
         await loadModel((p) => { if (p.status === 'progress' && p.file?.endsWith('.onnx')) status(`Downloading the model… ${Math.round(p.progress)}%`); });
         status('Comparing meaning…');
         const { sentences } = await import('./text.js');
-        matrix = await meaningMatrix(sentences(essay).map((s) => s.text), passagesOf(sources).map((p) => p.context));
+        matrix = await meaningMatrix(sentences(essay).map((s) => s.text), passagesOf(sources).map((p) => p.context), (f) => status(`Comparing meaning… ${Math.round(f * 100)}%`));
       } catch (err) {
         problem = modelProblem(err);
       }
