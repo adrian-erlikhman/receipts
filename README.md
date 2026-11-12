@@ -2,7 +2,7 @@
 
 Paste your essay and the sources you used. Receipts matches every sentence to the source it leans on and flags what a teacher would catch: copied wording without quotation marks, misquotes, figures that don't match the source, citations that are missing, and citations that point at the wrong source.
 
-**Live: https://adrian-erlikhman.github.io/receipts/** · [sample essay](https://adrian-erlikhman.github.io/receipts/?demo=1)
+**Live: https://adrian-erlikhman.github.io/receipts/** · [sample essay](https://adrian-erlikhman.github.io/receipts/?demo=1) · [1-minute demo](https://youtu.be/AjXb5bhWY_8)
 
 Everything runs in the browser. There is no server and no account.
 
