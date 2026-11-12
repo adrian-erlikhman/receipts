@@ -13,24 +13,56 @@ export const LIMITS = {
 
 const CITE = /\(([^()]{2,80}?)\)|\[(\d{1,2})\]/g;
 
+const NOT_NAME = /^(fig|figure|table|chapter|section|grade|page|appendix|step|part|level|class|period|room|unit|year|day|week)\b/i;
+
 export function citationsIn(text) {
   const out = [];
   let m;
   CITE.lastIndex = 0;
   while ((m = CITE.exec(text))) {
     if (m[2]) { out.push({ raw: m[0], number: Number(m[2]) }); continue; }
-    const inner = m[1].trim();
-    if (!/\p{L}{3,}/u.test(inner)) continue;
+    const inner = m[1].trim().replace(/^(qtd\.?|quoted|cited) in\s+/i, '');
+    // "Okafor (2023) found" or "As Okafor puts it ... (4)": the name is in the
+    // sentence before the year or page.
+    if (!/\p{L}{3,}/u.test(inner)) {
+      if (/^(?:(?:pp?|par)\.\s*)?\d/.test(inner)) out.push({ raw: m[0], name: null, before: text.slice(0, m.index) });
+      continue;
+    }
     if (/^(e\.g\.|i\.e\.|see|or|and|which|who)\b/i.test(inner)) continue;
     if (inner.split(/\s+/).length > 9) continue; // an aside, not a citation
-    const name = inner.replace(/\b(p|pp)\.\s*/g, '').replace(/,?\s*\d[\d\s,–-]*$/, '').replace(/\bet al\.?/, '').trim();
-    out.push({ raw: m[0], name });
+    const name = inner.replace(/\b(p|pp|par)\.\s*/g, '').replace(/,?\s*\d[\d\s,–-]*$/, '').replace(/\bet al\.?/, '').trim();
+    // Only something shaped like a citation: "(Okafor 4)", "(Rivera and Chen)".
+    // "(often before 7 a.m.)" and "(Table 2)" are asides.
+    const big = name.split(/\s+/).filter((w) => w.length > 3);
+    if (!/^\p{Lu}/u.test(name) || NOT_NAME.test(name) || !(/\d\s*$/.test(inner) || big.every((w) => /^\p{Lu}/u.test(w)))) continue;
+    out.push({ raw: m[0], name, acronym: /^\p{Lu}{2,6}$/u.test(name) });
   }
   return out;
 }
 
+// How a source's author can appear in a sentence: the full name, or the first
+// surname of "Rivera and Chen" or "Okafor et al.".
+function nameKeys(src) {
+  const a = words(src.author || '').join(' ');
+  if (!a) return [];
+  const first = a.split(' ')[0];
+  return a === first || /\b(and|et)\b/.test(a) || /&/.test(src.author) ? [a, first] : [a];
+}
+
+// Where in the text a source's author is last named, or -1.
+function namedAt(text, src) {
+  const hay = ` ${words(String(text).replace(/['’]s\b/g, '')).join(' ')} `;
+  return Math.max(-1, ...nameKeys(src).map((k) => hay.lastIndexOf(` ${k} `)));
+}
+
 function citedSource(cite, sources) {
   if (cite.number) return sources[cite.number - 1] ? cite.number - 1 : -1;
+  if (cite.name === null) {
+    let best = -1;
+    let at = -1;
+    sources.forEach((s, i) => { const p = namedAt(cite.before, s); if (p > at) { at = p; best = i; } });
+    return best;
+  }
   const n = norm(cite.name);
   let best = -1;
   sources.forEach((s, i) => {
@@ -135,15 +167,20 @@ export function check(essay, sources, opts = {}) {
     return { plain, quotes, ranked, top, best, sem, matchedBy, usesSource: best ? best.source : quoteSource ?? -1 };
   });
 
+  // Citations with the source each one points to. A year or page whose author
+  // isn't named before it, or an acronym like "(CDC)" that names no source, is
+  // left out rather than flagged.
+  const resolve = (text) => citationsIn(text).map((c) => ({ ...c, source: citedSource(c, sources) })).filter((c) => c.source >= 0 || !(c.name === null || c.acronym));
+
   const rows = sents.map((s, k) => {
     const { plain, quotes, ranked, top, best, sem, matchedBy, usesSource } = firstPass[k];
     const issues = [];
     const add = (kind, text) => issues.push({ kind, text });
-    const cites = citationsIn(s.text);
+    const cites = resolve(s.text);
     // A citation that closes the next sentence in the same paragraph covers
     // this one too, but only if both sentences lean on the same source.
     const next = sents[k + 1];
-    const nextCites = next && next.para === s.para && firstPass[k + 1].usesSource === usesSource ? citationsIn(next.text) : [];
+    const nextCites = next && next.para === s.para && firstPass[k + 1].usesSource === usesSource ? resolve(next.text) : [];
 
     // 1. Quotations have to appear word for word in a source.
     for (const q of quotes) {
@@ -184,10 +221,11 @@ export function check(essay, sources, opts = {}) {
     }
 
     // 5. Citations: missing, pointing at the wrong source, or pointing at nothing.
-    const cited = [...cites, ...(cites.length ? [] : nextCites)].map((c) => ({ ...c, source: citedSource(c, sources) }));
-    if (usesSource >= 0 && !cited.length) add('uncited', `This uses ${sources[usesSource].label} but has no citation.`);
+    // Naming the author in the sentence ("As Okafor puts it") also counts.
+    const cited = cites.length ? cites : nextCites;
+    if (usesSource >= 0 && !cited.length && namedAt(s.text, sources[usesSource]) < 0) add('uncited', `This uses ${sources[usesSource].label} but has no citation.`);
     for (const c of cites) {
-      const cs = citedSource(c, sources);
+      const cs = c.source;
       if (cs < 0) { add('unknown', `${c.raw} doesn't match any source in your list.`); continue; }
       if (usesSource >= 0 && cs !== usesSource) {
         const citedBest = ranked.filter((r) => passages[r.i].source === cs)[0];
@@ -200,7 +238,7 @@ export function check(essay, sources, opts = {}) {
     }
 
     let status = 'own';
-    if (issues.some((i) => ['misquote', 'number', 'wrongcite', 'nothing'].includes(i.kind))) status = 'wrong';
+    if (issues.some((i) => ['misquote', 'number', 'wrongcite', 'nothing', 'unknown'].includes(i.kind))) status = 'wrong';
     else if (close) status = 'close';
     else if (issues.some((i) => i.kind === 'uncited')) status = 'uncited';
     else if (usesSource >= 0) status = 'backed';
@@ -215,7 +253,7 @@ export function check(essay, sources, opts = {}) {
       meaningScore: sem ? sem.score : null,
       matchedBy,
       quotes,
-      cites: cites.map((c) => ({ ...c, source: citedSource(c, sources) })),
+      cites,
     };
   });
 

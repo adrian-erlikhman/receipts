@@ -39,6 +39,21 @@ t('citations are read; asides are not', () => {
   assert.deepEqual(c.map((x) => x.name ?? x.number), ['Okafor', 'Rivera and Chen', 2]);
 });
 
+const ONE = [{ author: 'Okafor', label: 'Okafor 2023', text: 'Most teenagers need eight hours of sleep, but fewer than a third get eight hours on school nights.' }];
+t('an author named in the sentence counts as a citation (APA narrative, MLA signal phrase)', () => {
+  for (const essay of ['Okafor (2023) found that fewer than a third of teenagers get eight hours on school nights.', 'As Okafor puts it, fewer than a third of teenagers get eight hours on school nights (4).', 'According to Okafor\'s survey, fewer than a third of teenagers get eight hours on school nights.']) {
+    const row = check(essay, ONE).rows[0];
+    assert.equal(row.source, 0, essay);
+    assert.ok(!row.issues.some((i) => i.kind === 'uncited'), essay);
+  }
+});
+t('asides in parentheses are not citations; a citation to a source not in the list is flagged', () => {
+  assert.deepEqual(citationsIn('Classes start early (often before 7:30 a.m.) and run late (Table 2). The CDC (Centers for Disease Control) agrees.').map((c) => c.name), ['Centers for Disease Control']);
+  const r = check('Teens sleep too little (often less than seven hours). The Centers for Disease Control (CDC) agrees. Fewer than a third get enough sleep (Smith 4).', ONE);
+  assert.deepEqual(r.rows.map((x) => x.issues.map((i) => i.kind)), [[], [], ['unknown']]);
+  assert.equal(r.rows[2].status, 'wrong');
+});
+
 t('wording overlap', () => {
   assert.equal(longestRun('the clock shifts later so teens stay up', 'Their internal clock shifts later so teens stay up late').length, 7);
   assert.ok(trigramContainment('a b c d e', 'x a b c d e y') === 1);

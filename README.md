@@ -13,9 +13,10 @@ Everything runs in the browser. There is no server and no account.
 | **Too close** | Seven or more words in a row from a source, or most of a sentence's three-word sequences, with no quotation marks. |
 | **Misquote** | Text inside quotation marks that doesn't appear word for word in any source. Case and punctuation don't count, "..." can stand for left-out words and [brackets] for changed ones. Titles and one- or two-word scare quotes are skipped. The flag names the closest source sentence. |
 | **Wrong figure** | A number with the same unit as one in the source, but a different value: "43 minutes" where the source says "34 minutes." |
-| **No citation** | The sentence leans on a source but neither it nor the next sentence (if that one uses the same source) cites it. |
+| **No citation** | The sentence leans on a source but neither it nor the next sentence (if that one uses the same source) cites it. Naming the author counts: "As Okafor puts it," "Okafor (2023) found." |
 | **Wrong citation** | The sentence cites one source but matches another much better. |
 | **Cites nothing** | The sentence cites a source, but nothing in that source matches it. |
+| **Unknown source** | A citation like "(Smith 4)" that names no source in your list. Asides in parentheses aren't read as citations. |
 | **Backed** | Matches a source and cites it. |
 | **Your own** | Matches no source. That's fine for your own argument. |
 
