@@ -123,6 +123,9 @@ function render() {
   const r = state.result;
   $('#report').hidden = !r;
   if (!r) return;
+  // The buttons are redrawn, so remember which one had keyboard focus.
+  const a = document.activeElement;
+  const keep = a?.dataset?.filter ? `[data-filter="${a.dataset.filter}"]` : a?.dataset?.act ? `[data-act="${a.dataset.act}"]` : null;
   $('#tally').innerHTML = ORDER.filter((k) => r.counts[k]).map((k) => `<button class="t-${k}" data-filter="${k}" aria-pressed="${state.filter === k}"><span class="n">${r.counts[k]}</span>${LABEL[k][0]}</button>`).join('');
 
   // Essay, sentence by sentence, keeping paragraphs.
@@ -135,6 +138,8 @@ function render() {
 
   const uses = state.sources.map((s, i) => r.rows.filter((x) => x.source === i).length);
   $('#sourcesUsed').innerHTML = `<h3>Your sources</h3><ul>${state.sources.map((s, i) => `<li><b>${esc(s.label)}</b>: ${uses[i] ? `${uses[i]} sentence${uses[i] > 1 ? 's' : ''} lean on it` : '<span style="color:var(--wrong)">nothing in the essay matches it. Did you use it?</span>'}</li>`).join('')}</ul>`;
+
+  if (keep) $(keep)?.focus();
 }
 
 function highlight(passage, sentence) {
@@ -156,13 +161,29 @@ function renderDetail() {
     ${src && row.passage ? `<p class="meta">Matched ${esc(src.label)} ${row.matchedBy === 'meaning' ? `by meaning (${row.meaningScore.toFixed(2)})` : `by shared words (${row.score.toFixed(2)})`}. Shared words are marked.</p><blockquote>${highlight(row.passage, row.text)}</blockquote>` : ''}
     ${src && row.passage ? `<button class="btn small" data-act="claude" ${state.key ? '' : 'disabled title="Add an API key below first"'}>Ask Claude: does this passage support it?</button>` : ''}
     ${claude ? `<div class="claude-out">${claude.error ? esc(claude.error) : `<b>${{ supports: 'Supports it', partly: 'Partly supports it', does_not_support: "Doesn't support it" }[claude.verdict]}.</b> ${esc(claude.why)}${claude.evidence ? `<blockquote>${esc(claude.evidence)}</blockquote>` : ''}`}</div>` : ''}
-    <div class="row" style="margin-top:12px"><button class="btn small ghost" data-act="prev">‹ Previous flag</button><button class="btn small ghost" data-act="next">Next flag ›</button></div>`;
+    ${nav()}`;
+}
+
+// Previous / next flag, with where this one sits among them.
+function nav() {
+  const flagged = state.result.rows.map((r, k) => (r.issues.length ? k : -1)).filter((k) => k >= 0);
+  if (!flagged.length) return '<p class="meta">Nothing in this essay is flagged.</p>';
+  const k = state.selected;
+  const at = flagged.indexOf(k);
+  const where = at >= 0 ? `Flag ${at + 1} of ${flagged.length}` : `${plural(flagged.length, 'flag')} in all`;
+  // aria-disabled rather than disabled, so keyboard focus stays on the button.
+  return `<div class="row nav"><button class="btn small ghost" data-act="prev" aria-disabled="${!(flagged[0] < k)}">‹ Previous flag</button><button class="btn small ghost" data-act="next" aria-disabled="${!(flagged[flagged.length - 1] > k)}">Next flag ›</button><span class="meta">${where}</span></div>`;
 }
 
 function step(dir) {
   const rows = state.result.rows;
   for (let k = state.selected + dir; k >= 0 && k < rows.length; k += dir) {
-    if (rows[k].issues.length) { state.selected = k; render(); return; }
+    if (rows[k].issues.length) {
+      state.selected = k;
+      render();
+      $('.s.sel')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      return;
+    }
   }
 }
 

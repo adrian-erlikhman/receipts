@@ -52,7 +52,7 @@ h3 { font: 700 18px var(--mono); margin: 4px 0 6px; }
 .btn.primary:hover { background: #000; }
 .btn.small { padding: 6px 11px; font-size: 13px; }
 .btn.ghost { border-color: var(--line); color: var(--ink-2); }
-.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn:disabled, .btn[aria-disabled="true"] { opacity: 0.45; cursor: not-allowed; }
 
 .report { padding-top: 6px; scroll-margin-top: 80px; }
 .tally { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
@@ -79,7 +79,9 @@ h3 { font: 700 18px var(--mono); margin: 4px 0 6px; }
 .s.dim { opacity: 0.35; }
 .s.sel { outline: 2px solid var(--ink); }
 
-.detail { position: sticky; top: 82px; background: var(--sheet); border: 2px solid var(--ink); padding: 18px; font-size: 15px; }
+.s { scroll-margin: 90px 0 24px; }
+.detail { position: sticky; top: 82px; max-height: calc(100vh - 100px); overflow-y: auto; background: var(--sheet); border: 2px solid var(--ink); padding: 18px; font-size: 15px; }
+.detail .nav { margin-top: 12px; }
 .detail .tag { display: inline-block; font: 700 12px var(--mono); text-transform: uppercase; letter-spacing: 0.08em; padding: 3px 8px; border-radius: 3px; }
 .detail blockquote { margin: 10px 0; padding: 10px 12px; background: #f6f2e6; border-left: 4px solid var(--line); font: 15px/1.6 var(--serif); }
 .detail mark { background: #ffe58a; padding: 0 1px; }
@@ -116,7 +118,10 @@ details.claude p { color: var(--ink-2); font-size: 14.5px; }
 
 @media (max-width: 880px) {
   .cols, .three, .pair { grid-template-columns: 1fr; }
-  .detail { position: static; }
+  /* On one column the panel docks to the bottom of the screen, so tapping a
+     sentence shows its detail without scrolling past the whole essay. */
+  .detail { top: auto; bottom: 0; max-height: 44vh; box-shadow: 0 -12px 24px -16px rgba(0, 0, 0, 0.5); }
+  .s { scroll-margin: 80px 0 calc(44vh + 16px); }
 }
 @media print {
   .top, .hero, .inputs, .how, .foot, .tally { display: none !important; }
