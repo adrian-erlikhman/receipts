@@ -10,7 +10,7 @@ Everything runs in the browser. There is no server and no account.
 
 | Flag | What it means |
 |---|---|
-| **Too close** | Seven or more words in a row from a source, or most of a sentence's three-word sequences, with no quotation marks. |
+| **Too close** | Seven or more words in a row from a source, or 45% or more of a sentence's three-word sequences, with no quotation marks. The flag says which. |
 | **Misquote** | Text inside quotation marks that doesn't appear word for word in any source. Case and punctuation don't count, "..." can stand for left-out words and [brackets] for changed ones. Titles and one- or two-word scare quotes are skipped. The flag names the closest source sentence. |
 | **Wrong figure** | A number with the same unit as one in the source, but a different value: "43 minutes" where the source says "34 minutes." |
 | **No citation** | The sentence leans on a source but neither it nor the next sentence (if that one uses the same source) cites it. Naming the author counts: "As Okafor puts it," "Okafor (2023) found." |
@@ -25,7 +25,7 @@ Click any sentence to see the passage it matched, with the shared words marked.
 ## How it works
 
 1. **Sentences.** The essay and each source are split into sentences, with care for "p.m.", "et al.", "p. 4", initials and decimals. A quotation that runs over two sentences stays one. Source passages are a sentence plus its neighbor, so a claim that spans two source sentences still finds them.
-2. **Match by words.** TF-IDF over word stems and stem pairs, cosine similarity. A sentence leans on a passage at 0.25 or above.
+2. **Match by words.** TF-IDF over word stems and stem pairs, cosine similarity. A sentence leans on a passage at 0.25 or above. If the sentence cites or names a source, 0.12 or three shared content words is enough for that source.
 3. **Match by meaning (optional).** Turn on the on-device model and Receipts also embeds every sentence and passage with all-MiniLM-L6-v2 (23 MB, quantized, run by Transformers.js in your browser). A paraphrase that shares few words with its source is matched at a cosine of 0.62 or above. Nothing is uploaded.
 4. **Checks.** Longest run of identical words and 3-word-sequence containment (quotations removed first), word-for-word quotation lookup, unit-aware figure comparison, and citation parsing for MLA, APA and numbered styles.
 5. **Ask Claude (optional, your own key).** For any matched sentence, Claude says whether the passage supports it, partly supports it, or doesn't. Its answer must quote the passage word for word or it is discarded (`verify` in `js/ai.js`, tested).

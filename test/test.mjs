@@ -62,6 +62,19 @@ t('asides in parentheses are not citations; a citation to a source not in the li
   assert.equal(r.rows[2].status, 'wrong');
 });
 
+const PLANTS = [
+  { author: 'Smith', label: 'Smith 2020', text: 'Photosynthesis is the process by which green plants use sunlight to make food. Photosynthesis in plants generally involves the green pigment chlorophyll and generates oxygen as a byproduct. The process takes place mainly in the leaves.' },
+  { author: 'Jones and Lee', label: 'Jones and Lee 2019', text: 'Without photosynthesis there would be almost no oxygen in the atmosphere. Early Earth had very little free oxygen until cyanobacteria began photosynthesizing about 2.4 billion years ago, an event called the Great Oxidation Event.' },
+];
+t('a sentence that cites or names a source needs less overlap to count as using it', () => {
+  const r = check('It mostly happens in the leaves, and oxygen is released as a byproduct (Smith). According to Jones and Lee, there would be almost no oxygen without it. Plants also grow better in warm rooms (Smith).', PLANTS);
+  assert.deepEqual(r.rows.map((x) => [x.status, x.source]), [['backed', 0], ['backed', 1], ['wrong', -1]]);
+});
+t('a "too close" flag says which rule it tripped', () => {
+  const r = check('Oxygen built up about 2.4 billion years ago in the Great Oxidation Event (Jones and Lee).', PLANTS);
+  assert.match(r.rows[0].issues[0].text, /^\d+% of its three-word phrases match the source/);
+});
+
 t('wording overlap', () => {
   assert.equal(longestRun('the clock shifts later so teens stay up', 'Their internal clock shifts later so teens stay up late').length, 7);
   assert.ok(trigramContainment('a b c d e', 'x a b c d e y') === 1);

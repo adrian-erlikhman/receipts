@@ -8,6 +8,7 @@ export const LIMITS = {
   run: 7, // identical words in a row, outside quotation marks
   containment: 0.45, // share of the sentence's 3-word sequences found in the passage
   minWords: 8,
+  cited: 0.12, // TF-IDF cosine, for the source the sentence cites or names
   meaning: 0.62, // on-device model cosine, when the model is turned on
 };
 
@@ -112,6 +113,12 @@ function inOrder(hay, parts) {
   return go(0, 0);
 }
 
+// How many different content words (stems) two texts share.
+function sharedTerms(a, b) {
+  const have = new Set(terms(b));
+  return new Set(terms(a).filter((t) => have.has(t))).size;
+}
+
 // The source sentence that shares the most of a misquote's words, if any
 // shares at least 40% of them.
 function closestSentence(quote, passages) {
@@ -142,6 +149,11 @@ export function check(essay, sources, opts = {}) {
   const index = buildIndex(passages, sents.map((s) => s.text));
   const sourceWords = sources.map((s) => words(s.text));
 
+  // Citations with the source each one points to. A year or page whose author
+  // isn't named before it, or an acronym like "(CDC)" that names no source, is
+  // left out rather than flagged.
+  const resolve = (text) => citationsIn(text).map((c) => ({ ...c, source: citedSource(c, sources) })).filter((c) => c.source >= 0 || !(c.name === null || c.acronym));
+
   // First pass: which source each sentence leans on.
   const meaning = opts.matrix || null; // matrix[k][p] from embed.js
   const firstPass = sents.map((s, k) => {
@@ -163,17 +175,21 @@ export function check(essay, sources, opts = {}) {
       sem = { i: bi, score: row[bi] };
       if (!best && sem.score >= L.meaning) { best = passages[bi]; matchedBy = 'meaning'; }
     }
+    let bestScore = best && matchedBy === 'words' ? top.score : 0;
+    // A sentence that cites or names a source needs less overlap with that
+    // source to count as using it: the writer has said where it came from.
+    if (!best) {
+      const pointed = new Set(resolve(s.text).map((c) => c.source));
+      sources.forEach((src, i) => { if (namedAt(s.text, src) >= 0) pointed.add(i); });
+      const hit = ranked.find((r) => pointed.has(passages[r.i].source));
+      if (hit && (hit.score >= L.cited || sharedTerms(plain, passages[hit.i].context) >= 3)) { best = passages[hit.i]; matchedBy = 'words'; bestScore = hit.score; }
+    }
     const quoteSource = quotes.find((q) => q.ok)?.source;
-    return { plain, quotes, ranked, top, best, sem, matchedBy, usesSource: best ? best.source : quoteSource ?? -1 };
+    return { plain, quotes, ranked, top, best, bestScore, sem, matchedBy, usesSource: best ? best.source : quoteSource ?? -1 };
   });
 
-  // Citations with the source each one points to. A year or page whose author
-  // isn't named before it, or an acronym like "(CDC)" that names no source, is
-  // left out rather than flagged.
-  const resolve = (text) => citationsIn(text).map((c) => ({ ...c, source: citedSource(c, sources) })).filter((c) => c.source >= 0 || !(c.name === null || c.acronym));
-
   const rows = sents.map((s, k) => {
-    const { plain, quotes, ranked, top, best, sem, matchedBy, usesSource } = firstPass[k];
+    const { plain, quotes, ranked, top, best, bestScore, sem, matchedBy, usesSource } = firstPass[k];
     const issues = [];
     const add = (kind, text) => issues.push({ kind, text });
     const cites = resolve(s.text);
@@ -205,7 +221,8 @@ export function check(essay, sources, opts = {}) {
           // Keep the last period of "p.m." or "U.S." when the run ends inside it.
           if (at && /(?:^|[^\p{L}])\p{L}\.\p{L}$/u.test(shown) && best.context[at.index + shown.length] === '.') shown += '.';
           close = { run: run.length, words: shown, containment: contain };
-          add('close', `${run.length} words in a row match the source without quotation marks ("${shown}"). Quote it or put it in your own words.`);
+          const why = run.length >= L.run ? `${run.length} words in a row match the source` : `${Math.round(contain * 100)}% of its three-word phrases match the source`;
+          add('close', `${why} without quotation marks ("${shown}"). Quote it or put it in your own words.`);
         }
       }
     }
@@ -252,7 +269,7 @@ export function check(essay, sources, opts = {}) {
       issues,
       source: usesSource,
       passage: best ? best.context : null,
-      score: top ? top.score : 0,
+      score: bestScore || (top ? top.score : 0),
       meaningScore: sem ? sem.score : null,
       matchedBy,
       quotes,
