@@ -24,7 +24,7 @@ Click any sentence to see the passage it matched, with the shared words marked.
 
 ## How it works
 
-1. **Sentences.** The essay and each source are split into sentences, with care for "p.m.", "et al.", initials and decimals. Source passages are a sentence plus its neighbor, so a claim that spans two source sentences still finds them.
+1. **Sentences.** The essay and each source are split into sentences, with care for "p.m.", "et al.", "p. 4", initials and decimals. A quotation that runs over two sentences stays one. Source passages are a sentence plus its neighbor, so a claim that spans two source sentences still finds them.
 2. **Match by words.** TF-IDF over word stems and stem pairs, cosine similarity. A sentence leans on a passage at 0.25 or above.
 3. **Match by meaning (optional).** Turn on the on-device model and Receipts also embeds every sentence and passage with all-MiniLM-L6-v2 (23 MB, quantized, run by Transformers.js in your browser). A paraphrase that shares few words with its source is matched at a cosine of 0.62 or above. Nothing is uploaded.
 4. **Checks.** Longest run of identical words and 3-word-sequence containment (quotations removed first), word-for-word quotation lookup, unit-aware figure comparison, and citation parsing for MLA, APA and numbered styles.
@@ -58,7 +58,8 @@ test/test.mjs   every planted problem, plus the splitter, quotations, figures, c
 - Receipts checks your essay against the sources you give it. It can't see sources you didn't paste, and it isn't a plagiarism detector for other people's work.
 - The thresholds were tuned on the sample essay and a few others. Treat every flag as something to look at, not a verdict.
 - Citation parsing covers the common in-text forms. Footnotes and full bibliographies aren't read.
-- The on-device model loads from the jsDelivr and Hugging Face CDNs the first time.
+- The on-device model loads from the jsDelivr and Hugging Face CDNs the first time (about 27 MB with its runtime, a few seconds on a fast connection) and from the browser's cache after that. If it can't load, the page says why and checks by words only.
+- It is built for English. Other languages that put spaces between words get the wording, quotation and figure checks, but the word stemming and the on-device model are English-only.
 
 ## Credits
 
