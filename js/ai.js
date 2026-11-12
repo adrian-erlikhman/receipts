@@ -14,7 +14,9 @@ export async function supportCheck({ key, model, sentence, passage }) {
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json', 'anthropic-dangerous-direct-browser-access': 'true' },
-    body: JSON.stringify({ model, max_tokens: 400, system: SYSTEM, messages: [{ role: 'user', content: `Essay sentence:\n${sentence}\n\nSource passage:\n${passage}` }] }),
+    // These models think before answering, and thinking counts toward
+    // max_tokens, so leave room for it; low effort keeps the answer quick.
+    body: JSON.stringify({ model, max_tokens: 4000, output_config: { effort: 'low' }, system: SYSTEM, messages: [{ role: 'user', content: `Essay sentence:\n${sentence}\n\nSource passage:\n${passage}` }] }),
   });
   if (!res.ok) {
     let msg = String(res.status);
@@ -22,7 +24,10 @@ export async function supportCheck({ key, model, sentence, passage }) {
     if (res.status === 401) msg = 'That API key was rejected.';
     throw new Error(msg);
   }
-  const text = (await res.json()).content.filter((b) => b.type === 'text').map((b) => b.text).join('');
+  const data = await res.json();
+  if (data.stop_reason === 'refusal') throw new Error('Claude declined to answer this one.');
+  const text = data.content.filter((b) => b.type === 'text').map((b) => b.text).join('');
+  if (!text.includes('{') && data.stop_reason === 'max_tokens') throw new Error("Claude's answer was cut off. Try again.");
   return verify(text, passage);
 }
 

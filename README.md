@@ -50,7 +50,7 @@ js/ai.js        optional Claude support check, with evidence verification
 js/samples.js   a made-up essay and three made-up sources with planted problems
 js/app.js       interface
 vendor/pdfjs    Mozilla pdf.js (Apache 2.0), for loading PDF sources
-test/test.mjs   every planted problem, plus the splitter, figures and citations
+test/test.mjs   every planted problem, plus the splitter, quotations, figures, citations and the Claude check
 ```
 
 ## Limits

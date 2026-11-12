@@ -3,9 +3,11 @@ import { sentences, numbersIn, norm } from '../js/text.js';
 import { longestRun, trigramContainment } from '../js/match.js';
 import { check, citationsIn } from '../js/check.js';
 import { SAMPLE } from '../js/samples.js';
+import { verify, supportCheck } from '../js/ai.js';
 
 let passed = 0;
 const t = (name, fn) => { try { fn(); passed++; } catch (e) { console.error('FAIL', name); throw e; } };
+const ta = async (name, fn) => { try { await fn(); passed++; } catch (e) { console.error('FAIL', name); throw e; } };
 
 t('sentences survive abbreviations, times and decimals', () => {
   const s = sentences('It costs $1.2 million (Rivera and Chen 4). They sleep at 11 p.m. on school nights. See Dr. Okafor, e.g. her 2023 study.\n\nNew paragraph here.');
@@ -131,6 +133,29 @@ t('the on-device model can add a match the words missed', () => {
   assert.equal(r2.rows[k].matchedBy, 'meaning');
   assert.equal(r2.rows[k].status, 'uncited');
   assert.equal(r2.rows[k].source, 0);
+});
+
+// The optional Claude check. No network: fetch is replaced for these tests.
+const PASSAGE = 'Average sleep on school nights rose by 34 minutes per night.';
+t('a Claude verdict is kept only if its evidence is quoted from the passage', () => {
+  assert.equal(verify('{"verdict": "partly", "evidence": "rose by 34 minutes", "why": "It gives 34, not 43."}', PASSAGE).verdict, 'partly');
+  assert.throws(() => verify('{"verdict": "supports", "evidence": "rose by 43 minutes", "why": "x"}', PASSAGE), /not in the passage/);
+  assert.throws(() => verify('{"verdict": "maybe"}', PASSAGE), /Unexpected verdict/);
+  assert.throws(() => verify('I think it supports it.', PASSAGE), /did not return JSON/);
+});
+await ta('the Claude request leaves room for thinking and reads only text blocks', async () => {
+  const real = globalThis.fetch;
+  let sent;
+  const reply = (body) => async (url, init) => { sent = JSON.parse(init.body); return { ok: true, json: async () => body }; };
+  try {
+    globalThis.fetch = reply({ stop_reason: 'end_turn', content: [{ type: 'thinking', thinking: '' }, { type: 'text', text: '{"verdict": "supports", "evidence": "34 minutes per night", "why": "It says so."}' }] });
+    assert.equal((await supportCheck({ key: 'test', model: 'claude-opus-5-5', sentence: 'Sleep rose 34 minutes.', passage: PASSAGE })).verdict, 'supports');
+    assert.ok(sent.max_tokens >= 2000);
+    globalThis.fetch = reply({ stop_reason: 'max_tokens', content: [{ type: 'thinking', thinking: '' }] });
+    await assert.rejects(supportCheck({ key: 'test', model: 'claude-opus-5-5', sentence: 's', passage: PASSAGE }), /cut off/);
+    globalThis.fetch = reply({ stop_reason: 'refusal', content: [] });
+    await assert.rejects(supportCheck({ key: 'test', model: 'claude-opus-5-5', sentence: 's', passage: PASSAGE }), /declined/);
+  } finally { globalThis.fetch = real; }
 });
 
 console.log(`${passed} tests passed`);
