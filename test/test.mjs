@@ -13,6 +13,16 @@ t('sentences survive abbreviations, times and decimals', () => {
   assert.equal(s[3].para, 1);
 });
 
+t('sentences still end at words like "sleep." and "help."', () => {
+  const s = sentences('Teens need more sleep. Schools should help. See p. 4 and No. 3 for more. Then we step up.');
+  assert.deepEqual(s.map((x) => x.text), ['Teens need more sleep.', 'Schools should help.', 'See p. 4 and No. 3 for more.', 'Then we step up.']);
+});
+
+t('a quotation that runs over two sentences stays one sentence', () => {
+  const s = sentences('As Okafor writes, "Teens need more sleep. Schools should help." That is the point. She says "they are not lazy ... [their] clocks run late" (Okafor).');
+  assert.deepEqual(s.map((x) => x.text), ['As Okafor writes, "Teens need more sleep. Schools should help."', 'That is the point.', 'She says "they are not lazy ... [their] clocks run late" (Okafor).']);
+});
+
 t('numbers carry their units; years and clock times are skipped', () => {
   const n = numbersIn('From 7:30 to 8:35 in 2024, students slept 43 more minutes and tardiness fell 18 percent, costing $1.2 million.');
   assert.deepEqual(n.map((x) => [x.value, x.unit]), [[43, 'minute'], [18, 'percent'], [1.2e6, 'money']]);

@@ -1,6 +1,11 @@
 // Splitting and normalizing text. No model, no network.
 
-const ABBREV = ['a.m.', 'p.m.', 'A.M.', 'P.M.', 'e.g.', 'i.e.', 'et al.', 'etc.', 'vs.', 'Dr.', 'Mr.', 'Mrs.', 'Ms.', 'Prof.', 'St.', 'U.S.', 'U.K.', 'No.', 'p.', 'pp.', 'Fig.', 'approx.', 'Jan.', 'Feb.', 'Mar.', 'Apr.', 'Aug.', 'Sept.', 'Oct.', 'Nov.', 'Dec.'];
+const ABBREV = ['a.m.', 'p.m.', 'A.M.', 'P.M.', 'e.g.', 'i.e.', 'et al.', 'etc.', 'vs.', 'Dr.', 'Mr.', 'Mrs.', 'Ms.', 'Prof.', 'St.', 'U.S.', 'U.K.', 'approx.', 'Jan.', 'Feb.', 'Mar.', 'Apr.', 'Aug.', 'Sept.', 'Oct.', 'Nov.', 'Dec.'];
+// These are only abbreviations when a number follows: "p. 4", "No. 3", "Fig. 2".
+const ABBREV_NUM = ['p.', 'pp.', 'No.', 'Fig.'];
+const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+// Whole words only, so "sleep." and "help." still end a sentence.
+const ABBREV_RE = new RegExp(`(?<![\\p{L}\\p{N}])(?:${ABBREV.map(escapeRe).join('|')}|(?:${ABBREV_NUM.map(escapeRe).join('|')})(?=\\s?\\d))`, 'gu');
 
 export const STOP = new Set('a an and are as at be been but by can could did do does for from had has have he her his how i if in into is it its may might more most no not of on or our she should so some such than that the their them then there these they this those to too was we were what when where which while who why will with would you your also about after all any because before between both during each few further here just over same only own very'.split(' '));
 
@@ -8,10 +13,10 @@ export const STOP = new Set('a an and are as at be been but by can could did do 
 // highlight them in place.
 export function sentences(text) {
   const src = String(text || '');
-  let masked = src;
-  for (const a of ABBREV) masked = masked.split(a).join(a.replace(/\./g, '․'));
+  let masked = src.replace(ABBREV_RE, (a) => a.replace(/\./g, '․'));
   masked = masked.replace(/\b([A-Z])\.(?=\s?[A-Z]\.)/g, '$1․'); // initials like J. R.
-  masked = masked.replace(/(\d)\.(?=\d)/g, '$1\u2024'); // decimals like 1.2
+  masked = masked.replace(/(\d)\.(?=\d)/g, '$1․'); // decimals like 1.2
+  masked = masked.replace(/\.\.\.(?=\s*[a-z[])/g, '․․․'); // an ellipsis mid-sentence
   const out = [];
   const re = /[^.!?\n]+(?:[.!?]+["”’)\]]*|\n|$)/g;
   let m;
@@ -23,7 +28,30 @@ export function sentences(text) {
     out.push({ text: textTrim, start, end: start + textTrim.length, para: paragraphIndex(src, start) });
     if (m[0] === '') re.lastIndex++;
   }
-  return mergeShort(out);
+  return mergeShort(mergeQuotes(out, src));
+}
+
+// True while a double quotation mark is open.
+function openQuote(t) {
+  const curly = (t.match(/“/g) || []).length - (t.match(/”/g) || []).length;
+  return curly > 0 || (t.match(/"/g) || []).length % 2 === 1;
+}
+
+// A quotation that runs over several sentences stays one sentence, so it can
+// be checked whole: As Okafor writes, "Teens are tired. They need sleep."
+function mergeQuotes(list, src) {
+  const out = [];
+  for (let i = 0; i < list.length; i++) {
+    let s = list[i];
+    if (openQuote(s.text)) {
+      for (let j = i + 1; j < list.length && j <= i + 4 && list[j].para === s.para; j++) {
+        const joined = src.slice(s.start, list[j].end);
+        if (!openQuote(joined)) { s = { ...s, text: joined, end: list[j].end }; i = j; break; }
+      }
+    }
+    out.push(s);
+  }
+  return out;
 }
 
 function paragraphIndex(src, pos) {
